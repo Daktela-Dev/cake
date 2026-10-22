@@ -1,17 +1,27 @@
-FROM daktela/php-fpm:8.2
+# PHP itself comes from the official image, which ships exact upstream patch releases
+# (Alpine's php82 packages lag behind). Bump the tag to move to a newer 8.2.x.
+FROM php:8.2.35-fpm-alpine3.24
 
-# Install PHP and other packages
+# PHP extensions (the same set daktela/php-fpm:8.2 had) + Xdebug, disabled unless XDEBUG_MODE is set
+COPY --from=mlocati/php-extension-installer:2.12.3 /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions bcmath calendar gd igbinary intl msgpack opcache pdo_mysql redis soap sockets zip xdebug && \
+    rm -f /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && \
+    cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
+    ln -s /usr/local/bin/php /usr/bin/php
+
+# Install other packages
 
 RUN apk update && \
     apk upgrade --no-cache && \
     apk add --no-cache nginx git curl nodejs npm yarn sudo nano vim ncdu
 
 # Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 COPY ./config/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY ./config/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ./config/php/php-ini-xdebug.ini /etc/php81/conf.d/50-xdebug.ini
+COPY ./config/php/php-ini-xdebug.ini /usr/local/etc/php/conf.d/50-xdebug.ini
+COPY ./config/php/zz-daktela.conf /usr/local/etc/php-fpm.d/zz-daktela.conf
 
 RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
 
@@ -27,11 +37,11 @@ RUN mkdir -p $PROJECT_ROOT && \
     mkdir -p /var/log/nginx/ &&\
     mkdir -p /run/nginx/ &&\
     mkdir -p /home/www/ &&\
+    mkdir -p /run/php-fpm/ &&\
     chown $USER:$USER -R ${PROJECT_ROOT} &&\
     chown $USER:$USER -R /var/log/nginx && \
     chown $USER:$USER -R /var/lib/nginx && \
     chown $USER:$USER -R /run/nginx/ && \
-    chown $USER:$USER -R /var/log/php81/ && \
     chown $USER:$USER -R /home/www/ && \
     chown $USER:$USER -R /run/php-fpm/ && \
     mkdir -p /var/lib/nignx/tmp && \

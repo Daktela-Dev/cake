@@ -42,9 +42,14 @@ php /usr/local/bin/wait-for-mysql.php
 
 printf "${BLUE}Database ready!${NC}\n"
 
-yarn install --frozen-lockfile
-
-printf "${BLUE}Yarn install done!${NC}\n"
+# Projects without a JS build (no package.json) skip this step
+if [ -f package.json ]
+then
+  yarn install --frozen-lockfile
+  printf "${BLUE}Yarn install done!${NC}\n"
+else
+  printf "${BLUE}No package.json, skipping yarn install.${NC}\n"
+fi
 
 cake cache clear_all
 
